@@ -1,0 +1,21 @@
+#!/bin/bash
+# wsshot-switch X [outfile] — switch to ws X, shoot, switch back (bash, 1 jq call)
+x=$1
+[[ $x =~ ^[0-9]+$ ]] || { echo "usage: wsshot-switch <workspace-number> [outfile]" >&2; exit 2; }
+out=${2:-$HOME/Pictures/wsshot-$x-$(date +%Y%m%d-%H%M%S).png}
+mkdir -p "${out%/*}"
+read -r vis geo orig wins < <(jq -nr --argjson n "$x" --argjson ws "$(i3-msg -t get_workspaces)" --argjson t "$(i3-msg -t get_tree)" '
+  ($ws[]|select(.num==$n)) as $w |
+  "\($w.visible) \($w.rect|"\(.width)x\(.height)+\(.x)+\(.y)") \($ws[]|select(.focused)|.num) \([$t|..|objects|select(.type?=="workspace" and .num==$n)|..|objects|select(.window?!=null)|.window]|join(","))"') ||
+  { echo "wsshot: workspace $x does not exist" >&2; exit 1; }
+[[ -n $vis ]] || { echo "wsshot: workspace $x does not exist" >&2; exit 1; }
+if [[ $vis == true ]]; then import -window root -crop "$geo" +repage "$out" && echo "$out"; exit; fi
+i3-msg -q "workspace number $x"
+for _ in {1..40}; do
+    for w in ${wins//,/ }; do xwininfo -id "$w" 2>/dev/null | grep -q IsViewable && break 2; done
+    sleep 0.01
+done
+sleep 0.06  # ponytail: short repaint wait after map
+import -window root -crop "$geo" +repage "$out"; rc=$?
+i3-msg -q "workspace number $orig"
+((rc)) || echo "$out"

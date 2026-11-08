@@ -1,0 +1,42 @@
+#!/bin/bash
+# wsshot X [outfile] — screenshot i3 workspace number X without switching the main screen.
+# Hidden ws windows are unmapped, so park the ws on a short-lived virtual monitor (VIRT), shoot it, move it back.
+x=$1
+[[ $x =~ ^[0-9]+$ ]] || { echo "usage: wsshot <workspace-number> [outfile]" >&2; exit 2; }
+out=${2:-$HOME/Pictures/wsshot-$x-$(date +%Y%m%d-%H%M%S).png}
+mkdir -p "$(dirname "$out")"
+
+ws=$(i3-msg -t get_workspaces)
+row=$(jq -c --argjson n "$x" '.[] | select(.num==$n)' <<<"$ws")
+[[ -n $row ]] || { echo "wsshot: workspace $x does not exist" >&2; exit 1; }
+
+crop() { import -window root -crop "$1" +repage "$out" && echo "$out"; }
+
+# already visible: plain capture of its output rect
+if [[ $(jq .visible <<<"$row") == true ]]; then
+    crop "$(jq -r '.rect | "\(.width)x\(.height)+\(.x)+\(.y)"' <<<"$row")"; exit
+fi
+
+lock=${XDG_RUNTIME_DIR:-/tmp}/wsshot.lock   # move-monitors bails while this exists
+[[ -e $lock ]] && { echo "wsshot: already running" >&2; exit 1; }
+orig_out=$(jq -r .output <<<"$row")
+focus=$(jq -r '.[] | select(.focused) | .num' <<<"$ws")
+w=$(jq .rect.width <<<"$row"); h=$(jq .rect.height <<<"$row")
+read -r fbw fbh < <(xrandr | sed -n 's/.*current \([0-9]*\) x \([0-9]*\),.*/\1 \2/p')
+id=$(i3-msg -t get_tree | jq -r --argjson n "$x" \
+    '.. | objects | select(.type?=="workspace" and .num==$n) | [.. | objects | select(.window? != null and .window != null)][0].id')
+
+touch "$lock"
+cleanup() {
+    i3-msg -q "[con_id=$id] move workspace to output $orig_out; workspace number $focus"
+    xrandr --delmonitor VIRT 2>/dev/null; xrandr --fb "${fbw}x${fbh}"
+    rm -f "$lock"
+}
+trap cleanup EXIT
+
+# ponytail: virtual monitor goes right of the current framebuffer, same size as the ws's output
+xrandr --fb "$((fbw + w))x$fbh" --setmonitor VIRT "$w/1x$h/1+$fbw+0" none || exit 1
+sleep 0.2
+i3-msg -q "[con_id=$id] move workspace to output VIRT; workspace number $x; workspace number $focus"
+sleep 0.3  # ponytail: fixed redraw delay, raise if frames come out stale
+crop "${w}x${h}+${fbw}+0"
