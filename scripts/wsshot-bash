@@ -1,7 +1,25 @@
 #!/bin/bash
-# wsshot-switch X [outfile] — switch to ws X, shoot, switch back (bash, 1 jq call)
+usage() {
+cat <<'EOT'
+wsshot-bash - screenshot an i3 workspace by number (bash version of wsshot).
+Switches to the workspace if it is hidden, captures it, switches back.
+
+Usage: wsshot-bash [-h|--help] <workspace-number> [outfile]
+
+Arguments:
+  workspace-number  i3 workspace number (leading digits of its name)
+  outfile           output PNG [default: ~/Pictures/wsshot-<N>-<timestamp>.png]
+
+Options:
+  -h, --help        print this help and exit
+
+Exit status: 0 success, 1 failure (e.g. workspace does not exist), 2 bad usage.
+EOT
+}
+case $1 in -h|--help) usage; exit 0;; esac
+# wsshot-bash X [outfile] — switch to ws X, shoot, switch back (bash, 1 jq call)
 x=$1
-[[ $x =~ ^[0-9]+$ ]] || { echo "usage: wsshot-switch <workspace-number> [outfile]" >&2; exit 2; }
+[[ $x =~ ^[0-9]+$ ]] || { echo "usage: wsshot-bash [-h] <workspace-number> [outfile]" >&2; exit 2; }
 out=${2:-$HOME/Pictures/wsshot-$x-$(date +%Y%m%d-%H%M%S).png}
 mkdir -p "${out%/*}"
 read -r vis geo orig wins < <(jq -nr --argjson n "$x" --argjson ws "$(i3-msg -t get_workspaces)" --argjson t "$(i3-msg -t get_tree)" '

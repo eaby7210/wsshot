@@ -1,8 +1,28 @@
 #!/bin/bash
+usage() {
+cat <<'EOT'
+wsshot-virtual - experimental: capture a hidden i3 workspace without switching your screen,
+by briefly moving it to a software monitor (xrandr --setmonitor). May flicker.
+
+Usage: wsshot-virtual [-h|--help] <workspace-number> [outfile]
+
+Arguments:
+  workspace-number  i3 workspace number (leading digits of its name)
+  outfile           output PNG [default: ~/Pictures/wsshot-<N>-<timestamp>.png]
+
+Options:
+  -h, --help        print this help and exit
+
+Note: holds $XDG_RUNTIME_DIR/wsshot.lock while the virtual monitor exists.
+
+Exit status: 0 success, 1 failure (e.g. workspace does not exist), 2 bad usage.
+EOT
+}
+case $1 in -h|--help) usage; exit 0;; esac
 # wsshot X [outfile] — screenshot i3 workspace number X without switching the main screen.
 # Hidden ws windows are unmapped, so park the ws on a short-lived virtual monitor (VIRT), shoot it, move it back.
 x=$1
-[[ $x =~ ^[0-9]+$ ]] || { echo "usage: wsshot <workspace-number> [outfile]" >&2; exit 2; }
+[[ $x =~ ^[0-9]+$ ]] || { echo "usage: wsshot-virtual [-h] <workspace-number> [outfile]" >&2; exit 2; }
 out=${2:-$HOME/Pictures/wsshot-$x-$(date +%Y%m%d-%H%M%S).png}
 mkdir -p "$(dirname "$out")"
 

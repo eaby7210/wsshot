@@ -38,12 +38,28 @@ install -m755 target/release/wsshot ~/.local/bin/wsshot
 ## Usage
 
 ```
-wsshot <workspace-number> [outfile]
+wsshot [OPTIONS] <WORKSPACE> [OUTFILE]
 ```
 
-- `workspace-number` — the i3 workspace *number* (the leading digits of its name, so Regolith names like `3:<span>…` work).
-- `outfile` — default `~/Pictures/wsshot-<N>-<unix-time>.png`.
-- prints the output path on success. Exit codes: `0` ok, `1` workspace missing, `2` bad usage.
+| Argument / option | Meaning |
+|---|---|
+| `WORKSPACE` | i3 workspace *number* (the leading digits of its name, so Regolith names like `3:<span>…` work). |
+| `OUTFILE` | Output PNG. Default `~/Pictures/wsshot-<WORKSPACE>-<unix-time>.png`. |
+| `-d, --delay <MS>` | Milliseconds to wait for the repaint after the workspace is mapped. Default `60`. Raise for slow apps. |
+| `-h, --help` | Full help (`-h` short, `--help` long). |
+| `-V, --version` | Print version. |
+
+Prints the output path on success. Exit codes: `0` ok, `1` failure (workspace missing, i3 or X11 unreachable, cannot write file), `2` bad usage.
+
+Environment: `I3SOCK` (i3 IPC socket; default from `i3 --get-socketpath`), `DISPLAY`.
+
+```sh
+wsshot 2                 # -> ~/Pictures/wsshot-2-<time>.png
+wsshot 11 chat.png       # -> ./chat.png
+wsshot -d 150 1          # slower repaint wait
+```
+
+The bash scripts under `scripts/` accept `-h/--help` too.
 
 Bind it in your i3 config if you like:
 
@@ -81,7 +97,7 @@ workspaces onto the temporary monitor.
 - X11 only (no Wayland/sway).
 - Captures one output's worth of pixels: the workspace's rect. Floating windows are included because they're part of the screen.
 - Assumes a 32-bit BGRX root window (depth 24/32, little-endian), which is the norm.
-- The 60 ms repaint wait is a constant. If you get a half-drawn frame from a slow app, raise it in `src/main.rs`.
+- The repaint wait is a fixed delay (`--delay`, default 60 ms), not a real "frame is done" signal. If you get a half-drawn frame from a slow app, raise it with `--delay`.
 - Screenshots contain whatever is on screen. Mind where you save them.
 
 ## License
